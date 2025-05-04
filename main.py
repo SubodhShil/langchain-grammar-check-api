@@ -1,7 +1,7 @@
-from grammar_check_api import Application
+from grammar_check_api import GrammarCheckAPI
 
 # Create the application instance
-app_instance = Application()
+app_instance = GrammarCheckAPI()
 
 # Get the FastAPI app
 app = app_instance.get_app()
