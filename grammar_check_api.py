@@ -18,11 +18,18 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 class TextRequest(BaseModel):
     text: str
 
+class GrammarRule(BaseModel):
+    rule_name: str
+    description: str
+    correct_examples: List[str]
+    incorrect_examples: List[str]
+
 class Correction(BaseModel):
     error: str
     suggestion: str
     type: str
     explanation: str
+    grammar_rule: Optional[GrammarRule] = None
 
 class TextResponse(BaseModel):
     original_text: str
@@ -61,42 +68,68 @@ class PromptManager:
     def get_grammar_prompt() -> ChatPromptTemplate:
         """Returns a prompt template for grammar checking with detailed corrections"""
         return ChatPromptTemplate.from_template(
-            """You are a professional editor. Check the following text for grammar and spelling errors and correct them.
+            """You are a professional editor and an expert grammar tutor. Check the following text for grammar and spelling errors, factual errors, word choice issues, and suggest better word combinations.
             
             Original text: {text}
             
             Provide your response in the following JSON format:
 
-            ```
-
+            ```json
             {{
-
-              "corrected_text": "The corrected version of the text",
-
+              "corrected_text": "The corrected version of the text with ONLY grammatical errors fixed. DO NOT completely paraphrase the text.",
               "corrections": [
-
                 {{
-
-                  "error": "The original error text",
-
-                  "suggestion": "The corrected text",
-
-                  "type": "The type of error (e.g., spelling, grammar, punctuation, subject-verb agreement)",
-
-                  "explanation": "Brief explanation of why this is an error"
-
+                  "error": "The original error text (the exact part of the sentence that is incorrect)",
+                  "suggestion": "The corrected version of that specific part",
+                  "type": "The type of error (e.g., spelling, grammar, punctuation, subject-verb agreement, verb tense, noun form, article usage, factual error, word choice, word combination)",
+                  "explanation": "A brief, clear explanation of why this specific part is an error and how the suggestion fixes it.",
+                  "grammar_rule": {{
+                    "rule_name": "A concise name for the grammar rule that was violated (e.g., 'Subject-Verb Agreement for Singular Nouns', 'Past Tense Verb Form', 'Use of Definite Article').",
+                    "description": "A detailed but simple, beginner-friendly explanation of the grammar rule. Explain it as if you are teaching someone learning English. Avoid jargon where possible or explain it clearly.",
+                    "correct_examples": [
+                      "A clear example sentence demonstrating the correct application of the rule.",
+                      "Another clear example sentence, if applicable, showing a slightly different correct usage."
+                    ],
+                    "incorrect_examples": [
+                      "An example sentence showing the common mistake related to this rule (similar to the 'error' found).",
+                      "Another incorrect example, if it helps clarify the rule."
+                    ]
+                  }}
                 }}
-
               ]
-
             }}
-
             ```
             
-            If there are no errors, return the original text as corrected_text and an empty array for corrections.
-            Only include actual errors, not stylistic suggestions.
-            """
+            IMPORTANT INSTRUCTIONS:
+            1. For the "corrected_text", maintain the original text structure and only fix actual errors. DO NOT completely rewrite or paraphrase the text.
+            2. Only suggest complete paraphrasing when the correction type is specifically "word combination".
+            3. For grammatical errors, make minimal changes necessary to fix the specific issue.
+            4. Identify actual errors only - don't suggest stylistic changes unless they're grammatically incorrect.
+            5. For each correction, the "error" field must contain the exact text from the original that contains the error.
+            6. You MUST include a variety of correction types in your analysis, including:
+               - Grammar errors (verb tense, subject-verb agreement, etc.)
+               - Spelling errors
+               - Punctuation errors
+               - Factual errors (when statements are objectively incorrect)
+               - Word choice issues (when words are used incorrectly)
+               - Word combination suggestions (better phrasing options)
+            
+            Instructions for the "grammar_rule" object:
+            - "rule_name": Be specific. For example, instead of just "Verb Tense," use "Past Simple Tense for Completed Actions."
+            - "description": Make this the core of the educational part. Explain the 'why' behind the rule.
+            - "correct_examples": Ensure these are simple and directly illustrate the rule.
+            - "incorrect_examples": These should mirror common mistakes, ideally similar to the error found in the original text.
 
+            For non-grammatical issues like factual errors, word choice, or word combinations:
+            - Include these in the "corrections" array with appropriate "type" values
+            - For these types, the "grammar_rule" field can be null or contain simplified guidance on better writing practices
+            - For "word combination" type, you may suggest alternative phrasing that improves clarity or flow
+            - For "factual error" type, explain why the statement is factually incorrect and provide the correct information
+            - For "word choice" type, explain why the current word is inappropriate and suggest better alternatives
+            
+            If there are no errors in the original text, return the original text as "corrected_text" and an empty array for "corrections".
+            Ensure the JSON is well-formed.
+            """
         )
 
 class GrammarService:
